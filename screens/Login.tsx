@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert, Dimensions, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '../types';
 
-// Hook para tamanho responsivo
 const { width, height } = Dimensions.get('window');
+const ADMIN_EMAIL = 'admin@tapajos.com';
+const ADMIN_PASSWORD = 'admin';
 
 /**
  * Props da tela de Login
@@ -22,11 +23,28 @@ interface LoginProps {
  * Credenciais admin: email: admin@tapajos.com | senha: admin
  */
 const Login: React.FC<LoginProps> = ({ onLogin, onCancel }) => {
-  // Estado do email
   const [email, setEmail] = useState('');
-  
-  // Estado da senha
   const [password, setPassword] = useState('');
+
+  const renderActionButton = (label: string, onPress: () => void, variant: 'primary' | 'secondary' = 'primary') => (
+    <TouchableOpacity
+      style={[
+        styles.actionButton,
+        variant === 'secondary' ? styles.actionButtonSecondary : styles.actionButtonPrimary,
+      ]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      <Text
+        style={[
+          styles.actionButtonText,
+          variant === 'secondary' ? styles.actionButtonTextSecondary : styles.actionButtonTextPrimary,
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
 
   /**
    * Handler para login
@@ -40,39 +58,33 @@ const Login: React.FC<LoginProps> = ({ onLogin, onCancel }) => {
       return;
     }
 
-    // Verifica se é login de admin
-    if (email.toLowerCase() === 'admin@tapajos.com' && password === 'admin') {
+    if (email.toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
       const adminUser: User = {
         id: 'admin',
         name: 'Administrador',
         age: 0,
         sex: 'N/A',
         email,
-        city: '', // Campo retirado mas mantido por compatibilidade
-        password: 'admin',
+        city: '',
+        password: ADMIN_PASSWORD,
         isAdmin: true,
       };
-      // Salva admin na sessão
       await AsyncStorage.setItem('user', JSON.stringify(adminUser));
       onLogin(adminUser);
       return;
     }
 
-    // Busca usuário no AsyncStorage
     const data = await AsyncStorage.getItem('users');
     const users: User[] = data ? JSON.parse(data) : [];
-    
-    // Procura usuário com email e senha correspondentes
+
     const existing = users.find(
       (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
     );
 
     if (existing) {
-      // Usuário encontrado - salva na sessão
       await AsyncStorage.setItem('user', JSON.stringify(existing));
       onLogin(existing);
     } else {
-      // Credenciais inválidas
       Alert.alert('Erro', 'Usuário não encontrado ou senha incorreta.\nFaça cadastro para criar uma conta nova.');
     }
   };
@@ -83,15 +95,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, onCancel }) => {
       style={styles.container}
     >
       <View style={styles.innerContainer}>
-        {/* Título da tela */}
-        <Text style={styles.title}>Acesso à Conta</Text>
-        
-        {/* Descrição */}
+        <View style={styles.headerBlock}>
+          <Text style={styles.eyebrow}>AquiFest</Text>
+          <Text style={styles.title}>Acesso a Conta</Text>
+        </View>
+
         <Text style={styles.description}>
           Digite suas credenciais para acessar sua conta
         </Text>
 
-        {/* Campo Email */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Email</Text>
           <TextInput
@@ -106,7 +118,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, onCancel }) => {
           />
         </View>
 
-        {/* Campo Senha */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Senha</Text>
           <TextInput
@@ -120,30 +131,19 @@ const Login: React.FC<LoginProps> = ({ onLogin, onCancel }) => {
           />
         </View>
 
-        {/* Dica para conta admin */}
-        <Text style={styles.hint}>
-          💡 Dica: Teste com admin@tapajos.com / admin
-        </Text>
-
-        {/* Botão de Login */}
-        <View style={styles.buttonContainer}>
-          <Button 
-            title="Entrar" 
-            onPress={handleLogin}
-            color="#4CAF50"
-          />
+        <View style={styles.hintCard}>
+          <Text style={styles.hintLabel}>Acesso administrador</Text>
+          <Text style={styles.hint}>Use admin@tapajos.com / admin</Text>
         </View>
 
-        {/* Espaçador */}
+        <View style={styles.buttonContainer}>
+          {renderActionButton('Entrar', handleLogin)}
+        </View>
+
         <View style={styles.spacer} />
 
-        {/* Botão de Cancelar */}
         <View style={styles.buttonContainer}>
-          <Button 
-            title="Voltar" 
-            onPress={onCancel}
-            color="#999"
-          />
+          {renderActionButton('Voltar', onCancel, 'secondary')}
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -155,80 +155,128 @@ const Login: React.FC<LoginProps> = ({ onLogin, onCancel }) => {
  * Utiliza Dimensions para adaptação automática
  */
 const styles = StyleSheet.create({
-  // Container principal com fundo verde claro
   container: {
     flex: 1,
-    backgroundColor: '#f0f8f0',
+    backgroundColor: '#eef5ef',
   },
 
-  // Container interno com centralização
   innerContainer: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: width * 0.08, // 8% da largura
-    paddingVertical: height * 0.05, // 5% da altura
+    paddingHorizontal: width * 0.08,
+    paddingVertical: height * 0.05,
   },
 
-  // Título da tela
+  headerBlock: {
+    marginBottom: 8,
+  },
+
+  eyebrow: {
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+    color: '#5a6d60',
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+
   title: {
     fontSize: width > 400 ? 28 : 24,
     textAlign: 'center',
     marginBottom: 10,
-    fontWeight: '700',
-    color: '#2E7D32',
+    fontWeight: '800',
+    color: '#1d4728',
   },
 
-  // Descrição/subtítulo
   description: {
     textAlign: 'center',
-    color: '#666',
+    color: '#5a6d60',
     marginBottom: 30,
     fontSize: 14,
     lineHeight: 20,
   },
 
-  // Grupo para cada campo de entrada
   inputGroup: {
     marginBottom: 20,
   },
 
-  // Label dos inputs
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#388E3C',
+    fontWeight: '700',
+    color: '#295c37',
     marginBottom: 8,
   },
 
-  // Input field com border e padding responsivo
   input: {
-    borderWidth: 2,
-    borderColor: '#4CAF50',
-    padding: 12,
-    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bdd5bf',
+    padding: 14,
+    borderRadius: 16,
     fontSize: 16,
     backgroundColor: '#fff',
     color: '#333',
   },
 
-  // Dica de login para teste
-  hint: {
-    textAlign: 'center',
-    color: '#888',
-    fontSize: 12,
-    marginBottom: 25,
-    fontStyle: 'italic',
-    paddingHorizontal: 10,
+  hintCard: {
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: '#dcecdc',
+    marginBottom: 10,
   },
 
-  // Container de botão com espaço consistente
+  hintLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#295c37',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+
+  hint: {
+    textAlign: 'center',
+    color: '#476451',
+    fontSize: 13,
+  },
+
   buttonContainer: {
     marginVertical: 10,
   },
 
-  // Espaçador entre botões
   spacer: {
     height: 15,
+  },
+
+  actionButton: {
+    minHeight: 48,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+
+  actionButtonPrimary: {
+    backgroundColor: '#1f6f43',
+    borderColor: '#1f6f43',
+  },
+
+  actionButtonSecondary: {
+    backgroundColor: '#ffffff',
+    borderColor: '#bdd5bf',
+  },
+
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  actionButtonTextPrimary: {
+    color: '#ffffff',
+  },
+
+  actionButtonTextSecondary: {
+    color: '#295c37',
   },
 });
 

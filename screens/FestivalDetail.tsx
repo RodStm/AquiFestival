@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, Button, StyleSheet, Alert, Linking, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, Image, Button, StyleSheet, Alert, Linking, ScrollView, TouchableOpacity, Dimensions, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Festival, User, Attendance } from '../types';
 
@@ -12,12 +12,15 @@ const { width, height } = Dimensions.get('window');
  * user: Usuário atual (pode ser null)
  * onBack: Callback para voltar
  * onEdit: Callback para editar festival
+ * onDelete: Callback para deletar festival
  */
 interface FestivalDetailProps {
   festival: Festival;
   user: User | null;
   onBack: () => void;
   onEdit: () => void;
+  onDelete: () => void;
+  onSuspend: () => void;
 }
 
 /**
@@ -31,7 +34,9 @@ const FestivalDetail: React.FC<FestivalDetailProps> = ({
   festival, 
   user, 
   onBack, 
-  onEdit 
+  onEdit,
+  onDelete,
+  onSuspend
 }) => {
   // Estado se usuário confirmou presença
   const [attending, setAttending] = useState(false);
@@ -41,6 +46,11 @@ const FestivalDetail: React.FC<FestivalDetailProps> = ({
   
   // Estado se imagem falhou ao carregar
   const [imageError, setImageError] = useState(false);
+
+  // Estado para feedback e confirmação de exclusão
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
 
   // Validação: festival não encontrado
   if (!festival) {
@@ -67,50 +77,60 @@ const FestivalDetail: React.FC<FestivalDetailProps> = ({
   };
 
   /**
-   * Deleta o festival com confirmação
-   * Apenas criador pode deletar
+   * Deleta o festival com confirmação (usando Modal customizado)
    */
-  const deleteFestival = async () => {
-    Alert.alert(
-      'Excluir Festival',
-      'Tem certeza que deseja excluir este festival? Esta ação não pode ser desfeita.',
-      [
-        { text: 'Cancelar', onPress: () => {} },
-        {
-          text: 'Excluir',
-          onPress: async () => {
-            const data = await AsyncStorage.getItem('festivals');
-            const festivals: Festival[] = data ? JSON.parse(data) : [];
-            // Remove festival do array
-            const filtered = festivals.filter((f) => f.id !== festival.id);
-            await AsyncStorage.setItem('festivals', JSON.stringify(filtered));
-            Alert.alert('Sucesso', 'Festival excluído com sucesso!');
-            onBack();
-          },
-          style: 'destructive',
-        },
-      ]
-    );
+  const deleteFestival = () => {
+    if (!user?.isAdmin) {
+      setFeedbackMessage('Apenas o administrador pode excluir festivais.');
+      setFeedbackModalVisible(true);
+      return;
+    }
+
+    setDeleteConfirmVisible(true);
   };
 
-  /**
-   * Suspende o festival (placeholder para funcionalidade futura)
-   * Apenas criador pode suspender
-   */
+  const confirmDeleteFestival = async () => {
+    setDeleteConfirmVisible(false);
+
+    if (!user?.isAdmin) {
+      setFeedbackMessage('Apenas o administrador pode excluir festivais.');
+      setFeedbackModalVisible(true);
+      return;
+    }
+
+    try {
+      const data = await AsyncStorage.getItem('festivals');
+      const festivals: Festival[] = data ? JSON.parse(data) : [];
+      const filtered = festivals.filter((f) => f.id !== festival.id);
+      await AsyncStorage.setItem('festivals', JSON.stringify(filtered));
+      onDelete();
+    } catch (error) {
+      setFeedbackMessage('Nao foi possivel excluir o festival.');
+      setFeedbackModalVisible(true);
+    }
+  };
+
   const suspendFestival = async () => {
-    Alert.alert(
-      'Suspender Festival',
-      'Tem certeza que deseja suspender este festival?',
-      [
-        { text: 'Cancelar', onPress: () => {} },
-        {
-          text: 'Suspender',
-          onPress: () => {
-            Alert.alert('Sucesso', 'Festival suspenso com sucesso!');
-          },
-        },
-      ]
-    );
+    setDeleteConfirmVisible(false);
+
+    if (!user?.isAdmin) {
+      setFeedbackMessage('Apenas o administrador pode suspender festivais.');
+      setFeedbackModalVisible(true);
+      return;
+    }
+
+    try {
+      const data = await AsyncStorage.getItem('festivals');
+      const festivals: Festival[] = data ? JSON.parse(data) : [];
+      const updatedFestivals = festivals.map((item) =>
+        item.id === festival.id ? { ...item, suspended: true } : item
+      );
+      await AsyncStorage.setItem('festivals', JSON.stringify(updatedFestivals));
+      onSuspend();
+    } catch (error) {
+      setFeedbackMessage('Nao foi possivel suspender o festival.');
+      setFeedbackModalVisible(true);
+    }
   };
 
   /**
@@ -166,6 +186,34 @@ const FestivalDetail: React.FC<FestivalDetailProps> = ({
     }
   };
 
+  const renderPrimaryAction = (
+    label: string,
+    onPress: () => void,
+    variant: 'primary' | 'secondary' | 'warning' = 'primary',
+    disabled = false
+  ) => (
+    <TouchableOpacity
+      style={[
+        styles.primaryAction,
+        variant === 'secondary' && styles.primaryActionSecondary,
+        variant === 'warning' && styles.primaryActionWarning,
+        disabled && styles.primaryActionDisabled,
+      ]}
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.85}
+    >
+      <Text
+        style={[
+          styles.primaryActionText,
+          variant === 'secondary' && styles.primaryActionTextSecondary,
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.container}>
       {/* ===== HEADER COM MENU ===== */}
@@ -192,8 +240,8 @@ const FestivalDetail: React.FC<FestivalDetailProps> = ({
             <Text style={styles.menuItemText}>← Voltar</Text>
           </TouchableOpacity>
           
-          {/* Opções de edição (apenas para criador) */}
-          {user && user.id === festival.createdBy && (
+          {/* Opções administrativas */}
+          {user?.isAdmin && (
             <>
               {/* Editar */}
               <TouchableOpacity 
@@ -224,9 +272,9 @@ const FestivalDetail: React.FC<FestivalDetailProps> = ({
       )}
 
       {/* ===== CONTEÚDO PRINCIPAL ===== */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={true}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Imagem do festival */}
-        {imageError ? (
+        {!festival.poster || imageError ? (
           <View style={[styles.image, styles.imagePlaceholder]}>
             <Text style={styles.placeholderText}>Imagem não disponível</Text>
           </View>
@@ -234,53 +282,95 @@ const FestivalDetail: React.FC<FestivalDetailProps> = ({
           <Image
             source={{ uri: festival.poster }}
             style={styles.image}
-            onError={() => setImageError(true)}
+            onError={() => {
+              console.log('Erro ao carregar imagem:', festival.poster);
+              setImageError(true);
+            }}
           />
         )}
 
-        {/* ===== SEÇÃO: PERÍODO ===== */}
-        <Text style={styles.sectionTitle}>Período</Text>
-        <Text style={styles.text}>
-          📅 {festival.startDate} até {festival.endDate}
-        </Text>
-
-        {/* ===== SEÇÃO: LOCALIZAÇÃO ===== */}
-        <Text style={styles.sectionTitle}>Localização</Text>
-        <Text style={styles.text}>📍 {festival.location}</Text>
-        <View style={styles.mapButtonContainer}>
-          <Button 
-            title="Ver no mapa" 
-            onPress={openMapLink}
-            color="#4CAF50"
-          />
+        <View style={styles.infoCard}>
+          <Text style={styles.sectionTitle}>Periodo</Text>
+          <Text style={styles.text}>📅 {festival.startDate} ate {festival.endDate}</Text>
         </View>
 
-        {/* ===== SEÇÃO: HISTÓRIA ===== */}
-        <Text style={styles.sectionTitle}>História</Text>
-        <Text style={styles.text}>{festival.history}</Text>
+        <View style={styles.infoCard}>
+          <Text style={styles.sectionTitle}>Localizacao</Text>
+          <Text style={styles.text}>📍 {festival.location}</Text>
+          <View style={styles.mapButtonContainer}>
+            {renderPrimaryAction('Ver no mapa', openMapLink, 'secondary')}
+          </View>
+        </View>
 
-        {/* ===== BOTÃO: CONFIRMAR PRESENÇA ===== */}
+        <View style={styles.infoCard}>
+          <Text style={styles.sectionTitle}>Historia</Text>
+          <Text style={styles.text}>{festival.history}</Text>
+        </View>
+
         <View style={styles.attendanceButtonContainer}>
           {user && !user.isAdmin && (
-            <Button
-              title={attending ? '✓ Presença Confirmada' : 'Confirmar Presença'}
-              onPress={confirmAttendance}
-              disabled={attending}
-              color={attending ? '#4CAF50' : '#4CAF50'}
-            />
+            renderPrimaryAction(
+              attending ? 'Presenca confirmada' : 'Confirmar presenca',
+              confirmAttendance,
+              'primary',
+              attending
+            )
           )}
           {!user && (
-            <Button
-              title="📱 Confirmar Presença (faça login)"
-              onPress={confirmAttendance}
-              color="#FFC107"
-            />
+            renderPrimaryAction('Confirmar presenca (faca login)', confirmAttendance, 'warning')
           )}
         </View>
 
-        {/* Espaços para scroll confortável */}
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      <Modal
+        transparent={true}
+        visible={feedbackModalVisible}
+        animationType="fade"
+        onRequestClose={() => setFeedbackModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Erro</Text>
+            <Text style={styles.modalMessage}>{feedbackMessage}</Text>
+            <TouchableOpacity 
+              onPress={() => setFeedbackModalVisible(false)}
+              style={styles.modalButton}
+            >
+              <Text style={styles.modalButtonText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent={true}
+        visible={deleteConfirmVisible}
+        animationType="fade"
+        onRequestClose={() => setDeleteConfirmVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Excluir Festival</Text>
+            <Text style={styles.modalMessage}>Tem certeza que deseja excluir este festival?</Text>
+            <View style={{ flexDirection: 'row', marginTop: 20 }}>
+              <TouchableOpacity
+                onPress={() => setDeleteConfirmVisible(false)}
+                style={[styles.modalButton, { backgroundColor: '#888', marginRight: 10 }]}
+              >
+                <Text style={styles.modalButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={confirmDeleteFestival}
+                style={[styles.modalButton, { backgroundColor: '#d32f2f' }]}
+              >
+                <Text style={styles.modalButtonText}>Excluir</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -289,37 +379,34 @@ const FestivalDetail: React.FC<FestivalDetailProps> = ({
  * Estilos responsivos da tela de Detalhes
  */
 const styles = StyleSheet.create({
-  // Container principal
   container: {
     flex: 1,
-    backgroundColor: '#f0f8f0',
+    backgroundColor: '#eef5ef',
   },
 
-  // Header com título e menu
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    backgroundColor: '#4CAF50',
-    borderBottomWidth: 3,
-    borderBottomColor: '#2E7D32',
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    backgroundColor: '#1f6f43',
+    borderBottomWidth: 1,
+    borderBottomColor: '#185434',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
 
-  // Botão do menu (hamburger)
   menuButton: {
     paddingRight: 15,
-    paddingVertical: 5,
+    paddingVertical: 8,
   },
 
-  // Ícone do menu
   menuIcon: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
   },
 
-  // Título no header
   headerTitle: {
     fontSize: width > 400 ? 18 : 16,
     fontWeight: '700',
@@ -327,14 +414,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Menu drop-down
   menu: {
+    marginHorizontal: 16,
+    marginTop: 10,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#4CAF50',
+    borderRadius: 18,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#17321f',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
   },
 
-  // Item do menu
   menuItem: {
     paddingVertical: 14,
     paddingHorizontal: 20,
@@ -342,88 +434,122 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e0e0e0',
   },
 
-  // Texto do menu
   menuItemText: {
     fontSize: 15,
     color: '#4CAF50',
     fontWeight: '500',
   },
 
-  // Item do menu com destaque (perigo)
   menuItemDanger: {
     paddingVertical: 14,
     paddingHorizontal: 20,
     backgroundColor: '#ffebee',
   },
 
-  // Texto do menu (perigo)
   menuItemTextDanger: {
     fontSize: 15,
     color: '#d32f2f',
     fontWeight: '600',
   },
 
-  // Conteúdo principal (scrollável)
   content: {
     flex: 1,
-    paddingVertical: 2,
+    paddingVertical: 16,
   },
 
-  // Imagem do festival
   image: {
-    width: '100%',
-    height: width * 0.6, // Responsivo
+    width: width - 32,
+    height: 250,
+    marginHorizontal: 16,
     marginBottom: 20,
-    borderRadius: 8,
+    borderRadius: 24,
     resizeMode: 'cover',
   },
 
-  // Placeholder quando imagem não carrega
   imagePlaceholder: {
     backgroundColor: '#e0e0e0',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#ccc',
   },
 
-  // Texto do placeholder
   placeholderText: {
-    color: '#999',
+    color: '#666',
     fontSize: 16,
+    fontWeight: '600',
   },
 
-  // Título de seção
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginTop: 20,
+    fontSize: 13,
+    fontWeight: '800',
     marginBottom: 10,
-    marginHorizontal: 20,
-    color: '#2E7D32',
+    color: '#1f6f43',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
 
-  // Texto de conteúdo
   text: {
     fontSize: 15,
-    color: '#333',
-    marginBottom: 12,
-    marginHorizontal: 20,
+    color: '#33463a',
+    marginBottom: 4,
     lineHeight: 24,
   },
 
-  // Container do botão do mapa
+  infoCard: {
+    marginHorizontal: 16,
+    marginBottom: 14,
+    padding: 18,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    elevation: 3,
+    shadowColor: '#17321f',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+  },
+
   mapButtonContainer: {
-    marginHorizontal: 20,
-    marginBottom: 20,
+    marginTop: 14,
   },
 
-  // Container do botão de presença
   attendanceButtonContainer: {
-    marginHorizontal: 20,
-    marginTop: 25,
+    marginHorizontal: 16,
+    marginTop: 8,
     marginBottom: 20,
   },
 
-  // Texto de erro
+  primaryAction: {
+    minHeight: 50,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1f6f43',
+  },
+
+  primaryActionSecondary: {
+    backgroundColor: '#e4f1e6',
+  },
+
+  primaryActionWarning: {
+    backgroundColor: '#d49a1f',
+  },
+
+  primaryActionDisabled: {
+    backgroundColor: '#9eb2a2',
+  },
+
+  primaryActionText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  primaryActionTextSecondary: {
+    color: '#1f6f43',
+  },
+
   errorText: {
     fontSize: 18,
     color: '#d32f2f',
@@ -432,10 +558,56 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Espaço no fundo para scroll confortável
   bottomSpacer: {
     height: 20,
   },
-});
 
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: 30,
+    borderRadius: 12,
+    width: '80%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginBottom: 15,
+  },
+
+  modalMessage: {
+    fontSize: 18,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontWeight: '600',
+  },
+
+  modalButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
 export default FestivalDetail;

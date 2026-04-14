@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert, ScrollView, TouchableOpacity, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert, ScrollView, TouchableOpacity, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '../types';
 
-// Hook para tamanho responsivo
 const { width, height } = Dimensions.get('window');
 
 /**
@@ -26,25 +25,34 @@ interface RegisterUserProps {
  * - Senha: campo de texto seguro
  */
 const RegisterUser: React.FC<RegisterUserProps> = ({ onRegister, onCancel }) => {
-  // ===== ESTADOS DOS CAMPOS =====
-  
-  // Nome e seu estado de erro
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState('');
-  
-  // Idade e seu estado de erro
   const [age, setAge] = useState('');
   const [ageError, setAgeError] = useState('');
-  
-  // Sexo e seu estado de erro
   const [sex, setSex] = useState('');
   const [sexError, setSexError] = useState('');
-  
-  // Email
   const [email, setEmail] = useState('');
-  
-  // Senha
   const [password, setPassword] = useState('');
+
+  const renderActionButton = (label: string, onPress: () => void, variant: 'primary' | 'secondary' = 'primary') => (
+    <TouchableOpacity
+      style={[
+        styles.actionButton,
+        variant === 'secondary' ? styles.actionButtonSecondary : styles.actionButtonPrimary,
+      ]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      <Text
+        style={[
+          styles.actionButtonText,
+          variant === 'secondary' ? styles.actionButtonTextSecondary : styles.actionButtonTextPrimary,
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
 
   /**
    * Handler para mudança de nome
@@ -52,7 +60,6 @@ const RegisterUser: React.FC<RegisterUserProps> = ({ onRegister, onCancel }) => 
    * @param text - Texto digitado
    */
   const handleNameChange = (text: string) => {
-    // Regex permite letras (incluindo acentos) e espaços
     if (text === '' || /^[a-zA-ZÀ-ÿ\s]*$/.test(text)) {
       setName(text);
       setNameError('');
@@ -67,7 +74,6 @@ const RegisterUser: React.FC<RegisterUserProps> = ({ onRegister, onCancel }) => 
    * @param text - Texto digitado
    */
   const handleAgeChange = (text: string) => {
-    // Regex permite apenas 0-2 dígitos
     if (text === '' || /^\d{0,2}$/.test(text)) {
       setAge(text);
       setAgeError('');
@@ -91,51 +97,40 @@ const RegisterUser: React.FC<RegisterUserProps> = ({ onRegister, onCancel }) => 
    * Verifica se email já existe no banco de dados
    */
   const handleRegister = async () => {
-    // ===== VALIDAÇÕES =====
-
-    // Valida nome
     if (!name.trim()) {
       setNameError('Nome é obrigatório');
       return;
     }
 
-    // Valida idade
     if (!age) {
       setAgeError('Idade é obrigatória');
       return;
     }
 
-    // Valida sexo
     if (!sex) {
       setSexError('Selecione um sexo');
       return;
     }
 
-    // Valida email
     if (!email.trim()) {
       Alert.alert('Erro', 'Email é obrigatório');
       return;
     }
 
-    // Valida senha
     if (!password) {
       Alert.alert('Erro', 'Senha é obrigatória');
       return;
     }
 
-    // Validação final de nome (apenas letras)
     if (!/^[a-zA-ZÀ-ÿ\s]*$/.test(name)) {
       setNameError('Nome só pode conter letras');
       return;
     }
 
-    // Validação final de idade (1-2 dígitos)
     if (!/^\d{1,2}$/.test(age)) {
       setAgeError('Idade deve ser um número de 1 a 2 dígitos');
       return;
     }
-
-    // ===== VERIFICAÇÃO DE EMAIL DUPLICADO =====
 
     const data = await AsyncStorage.getItem('users');
     const users: User[] = data ? JSON.parse(data) : [];
@@ -148,27 +143,22 @@ const RegisterUser: React.FC<RegisterUserProps> = ({ onRegister, onCancel }) => 
       return;
     }
 
-    // ===== CRIAÇÃO DO NOVO USUÁRIO =====
-
     const newUser: User = {
-      id: Date.now().toString(), // ID único baseado em timestamp
+      id: Date.now().toString(),
       name,
       age: Number(age),
       sex,
       email,
-      city: '', // Campo removido do interface
+      city: '',
       password,
-      isAdmin: false, // Novo usuário não é admin
+      isAdmin: false,
     };
 
-    // Salva usuário no banco de dados
     users.push(newUser);
     await AsyncStorage.setItem('users', JSON.stringify(users));
-    
-    // Faz login automático do novo usuário
+
     await AsyncStorage.setItem('user', JSON.stringify(newUser));
-    
-    // Notifica sucesso e retorna
+
     Alert.alert('Sucesso', 'Cadastro realizado com sucesso!');
     onRegister(newUser);
   };
@@ -179,8 +169,10 @@ const RegisterUser: React.FC<RegisterUserProps> = ({ onRegister, onCancel }) => 
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* ===== TÍTULO ===== */}
-        <Text style={styles.title}>Criar Conta</Text>
+        <View style={styles.headerBlock}>
+          <Text style={styles.eyebrow}>AquiFest</Text>
+          <Text style={styles.title}>Criar Conta</Text>
+        </View>
         <Text style={styles.description}>
           Preencha os dados abaixo para se registrar
         </Text>
@@ -282,27 +274,14 @@ const RegisterUser: React.FC<RegisterUserProps> = ({ onRegister, onCancel }) => 
           />
         </View>
 
-        {/* ===== BOTÕES DE AÇÃO ===== */}
-        
-        {/* Botão Cadastrar */}
         <View style={styles.buttonContainer}>
-          <Button
-            title="Cadastrar Conta"
-            onPress={handleRegister}
-            color="#4CAF50"
-          />
+          {renderActionButton('Cadastrar Conta', handleRegister)}
         </View>
 
-        {/* Espaçador */}
         <View style={styles.spacer} />
 
-        {/* Botão Cancelar */}
         <View style={styles.buttonContainer}>
-          <Button
-            title="Voltar"
-            onPress={onCancel}
-            color="#999"
-          />
+          {renderActionButton('Voltar', onCancel, 'secondary')}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -314,68 +293,73 @@ const RegisterUser: React.FC<RegisterUserProps> = ({ onRegister, onCancel }) => 
  * Utiliza Dimensions para adaptação automática à tela
  */
 const styles = StyleSheet.create({
-  // Container principal
   container: {
     flex: 1,
-    backgroundColor: '#f0f8f0',
+    backgroundColor: '#eef5ef',
   },
 
-  // Conteúdo dentro do ScrollView
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: width * 0.08, // 8% da largura
-    paddingVertical: height * 0.03, // 3% da altura
+    paddingHorizontal: width * 0.08,
+    paddingVertical: height * 0.03,
   },
 
-  // Título principal
+  headerBlock: {
+    marginBottom: 8,
+  },
+
+  eyebrow: {
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+    color: '#5a6d60',
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+
   title: {
     fontSize: width > 400 ? 28 : 24,
     textAlign: 'center',
     marginBottom: 8,
-    fontWeight: '700',
-    color: '#2E7D32',
+    fontWeight: '800',
+    color: '#1d4728',
   },
 
-  // Descrição/subtítulo
   description: {
     textAlign: 'center',
-    color: '#666',
+    color: '#5a6d60',
     marginBottom: 25,
     fontSize: 14,
     lineHeight: 20,
   },
 
-  // Container para cada campo
   fieldGroup: {
     marginBottom: 18,
   },
 
-  // Label dos campos
   label: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#388E3C',
+    fontWeight: '700',
+    color: '#295c37',
     marginBottom: 6,
   },
 
-  // Input padrão
   input: {
-    borderWidth: 2,
-    borderColor: '#4CAF50',
-    padding: 12,
-    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bdd5bf',
+    padding: 14,
+    borderRadius: 16,
     fontSize: 16,
     backgroundColor: '#fff',
     color: '#333',
   },
 
-  // Input com erro (borda vermelha)
   inputError: {
     borderColor: '#d32f2f',
   },
 
-  // Texto de erro
   errorText: {
     color: '#d32f2f',
     fontSize: 12,
@@ -383,51 +367,76 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Container dos botões de sexo
   sexContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: 12,
   },
 
-  // Botão de seleção de sexo
   sexButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderWidth: 2,
-    borderColor: '#4CAF50',
-    borderRadius: 8,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#bdd5bf',
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
   },
 
-  // Botão de sexo selecionado (destacado)
   sexButtonSelected: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#2E7D32',
+    backgroundColor: '#1f6f43',
+    borderColor: '#1f6f43',
   },
 
-  // Texto do botão de sexo
   sexButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#4CAF50',
+    fontWeight: '700',
+    color: '#295c37',
   },
 
-  // Texto do botão de sexo selecionado
   sexButtonTextSelected: {
     color: '#fff',
   },
 
-  // Container de botão com espaço
   buttonContainer: {
     marginVertical: 10,
   },
 
-  // Espaçador entre botões
   spacer: {
     height: 15,
+  },
+
+  actionButton: {
+    minHeight: 48,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+
+  actionButtonPrimary: {
+    backgroundColor: '#1f6f43',
+    borderColor: '#1f6f43',
+  },
+
+  actionButtonSecondary: {
+    backgroundColor: '#ffffff',
+    borderColor: '#bdd5bf',
+  },
+
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  actionButtonTextPrimary: {
+    color: '#ffffff',
+  },
+
+  actionButtonTextSecondary: {
+    color: '#295c37',
   },
 });
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Button, StyleSheet, Image, FlatList, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, Dimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, Festival } from '../types';
 
@@ -42,6 +42,7 @@ const Home: React.FC<HomeProps> = ({
 }) => {
   // Estado dos festivais carregados
   const [festivals, setFestivals] = useState<Festival[]>([]);
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
 
   /**
    * Efeito que executa quando o componente monta ou refreshTrigger muda
@@ -60,54 +61,86 @@ const Home: React.FC<HomeProps> = ({
       const data = await AsyncStorage.getItem('festivals');
       if (data) {
         const parsed: Festival[] = JSON.parse(data);
+        const activeFestivals = parsed.filter((festival) => !festival.suspended);
         // Ordena festivais por data de início (mais próximos primeiro)
-        const sorted = parsed.sort(
+        const sorted = activeFestivals.sort(
           (a: Festival, b: Festival) => 
             new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
         );
         setFestivals(sorted);
+      } else {
+        setFestivals([]);
       }
     } catch (error) {
       console.error('Erro ao carregar festivais:', error);
     }
   };
 
+  const renderActionButton = (label: string, onPress: () => void, variant: 'primary' | 'secondary' = 'primary') => (
+    <TouchableOpacity
+      style={[
+        styles.actionButton,
+        variant === 'secondary' ? styles.actionButtonSecondary : styles.actionButtonPrimary,
+      ]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      <Text
+        style={[
+          styles.actionButtonText,
+          variant === 'secondary' ? styles.actionButtonTextSecondary : styles.actionButtonTextPrimary,
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
   return (
     <View style={styles.container}>
       {/* ===== HEADER COM LOGO E MENU ===== */}
       <View style={styles.header}>
-        {/* Logo da aplicação */}
-        <Image source={require('../assets/logo.png')} style={styles.logo} />
-        
-        {/* Menu de navegação responsivo */}
-        <View style={styles.menu}>
-          <View style={styles.buttonContainer}>
-            <Button title="Login" onPress={onLogin} color="#4CAF50" />
-          </View>
-          <View style={styles.buttonContainer}>
-            <Button title="Cadastrar Usuário" onPress={onRegisterUser} color="#4CAF50" />
-          </View>
-          <View style={styles.buttonContainer}>
-            <Button title="Cadastrar Festival" onPress={onRegisterFestival} color="#4CAF50" />
-          </View>
-          {/* Botão de Ver Festivais apenas para usuários logados */}
-          {user && (
+        {/* Linha superior com Logo e Menu lado a lado */}
+        <View style={styles.topRow}>
+          {/* Logo da aplicação - Lado esquerdo */}
+          <Image source={require('../assets/logo.png')} style={styles.logo} />
+          
+          {/* Menu de navegação responsivo - Expandido */}
+          <View style={styles.menu}>
             <View style={styles.buttonContainer}>
-              <Button title="Ver Festivais" onPress={onViewFestivals} color="#4CAF50" />
+              {renderActionButton('Login', onLogin, 'primary')}
             </View>
-          )}
+            <View style={styles.buttonContainer}>
+              {renderActionButton('Cadastrar Usuario', onRegisterUser, 'secondary')}
+            </View>
+            {user?.isAdmin && (
+              <View style={styles.buttonContainer}>
+                {renderActionButton('Cadastrar Festival', onRegisterFestival, 'primary')}
+              </View>
+            )}
+            {/* Botão de Ver Festivais apenas para usuários logados */}
+            {user && (
+              <View style={styles.buttonContainer}>
+                {renderActionButton('Ver Festivais', onViewFestivals, 'secondary')}
+              </View>
+            )}
+          </View>
         </View>
 
-        {/* Status de login do usuário */}
-        {user ? (
-          <Text style={styles.loggedIn}>
-            ✓ Logado como {user.name || user.email}
+        <View style={styles.heroPanel}>
+          <Text style={styles.heroTitle}>Celebre os festivais do Tapajos</Text>
+          <Text style={styles.heroSubtitle}>
+            Explore eventos ativos com uma visualizacao mais limpa e destaque para datas e locais.
           </Text>
+        </View>
+
+        {/* Status de login do usuário - Abaixo */}
+        {user ? (
+          <Text style={styles.loggedIn}>Logado como {user.name || user.email}</Text>
         ) : (
           <Text style={styles.loggedOut}>
-            ○ Ainda não logado
+            Ainda nao logado
           </Text>
-        )}
+        )}      
       </View>
 
       {/* ===== CONTEÚDO PRINCIPAL ===== */}
@@ -125,18 +158,38 @@ const Home: React.FC<HomeProps> = ({
             keyExtractor={(item) => item.id}
             // Renderiza cada festival como um card clicável
             renderItem={({ item }) => (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.item} 
                 onPress={() => onSelectFestival(item)}
-                activeOpacity={0.7} // Feedback visual ao pressionar
+                activeOpacity={0.7}
               >
-                {/* Imagem do festival */}
-                <Image source={{ uri: item.poster }} style={styles.festivalImage} />
-                {/* Título do festival */}
-                <Text style={styles.itemTitle}>{item.name}</Text>
+                {/* Imagem do festival com tratamento de erro */}
+                {imageErrors[item.id] || !item.poster ? (
+                  <View style={[styles.festivalImage, styles.festivalImagePlaceholder]}>
+                    <Text style={styles.festivalImagePlaceholderText}>📸</Text>
+                  </View>
+                ) : (
+                  <Image 
+                    source={{ uri: item.poster }} 
+                    style={styles.festivalImage}
+                    onError={() => {
+                      setImageErrors(prev => ({ ...prev, [item.id]: true }));
+                    }}
+                  />
+                )}
+                <View style={styles.itemContent}>
+                  <View style={styles.itemTopRow}>
+                    <Text style={styles.itemTitle}>{item.name}</Text>
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>Ativo</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.itemMeta}>📅 {item.startDate} ate {item.endDate}</Text>
+                  <Text style={styles.itemMeta}>📍 {item.location}</Text>
+                  <Text style={styles.itemLink}>Toque para ver detalhes</Text>
+                </View>
               </TouchableOpacity>
             )}
-            // Adiciona padding entre itens
             scrollEnabled={true}
             showsVerticalScrollIndicator={true}
           />
@@ -151,114 +204,205 @@ const Home: React.FC<HomeProps> = ({
  * Utiliza Dimensions para adaptar tamanhos à tela do dispositivo
  */
 const styles = StyleSheet.create({
-  // Container principal com background verde claro
   container: {
     flex: 1,
-    backgroundColor: '#f0f8f0',
+    backgroundColor: '#eef5ef',
   },
 
-  // Header com logo e menu de navegação
   header: {
-    padding: width * 0.05, // 5% da largura para padding responsivo
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: '#4CAF50',
-    backgroundColor: '#fff',
+    padding: width * 0.05,
+    borderBottomWidth: 1,
+    borderBottomColor: '#d7e6d8',
+    backgroundColor: '#f8fbf8',
   },
 
-  // Logo da aplicação (responsivo)
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+
   logo: {
-    width: width * 0.25, // 25% da largura da tela
-    height: width * 0.25, // Mantém proporção quadrada
-    marginBottom: 15,
+    width: 50,
+    height: 50,
+    marginRight: 15,
     resizeMode: 'contain',
   },
 
-  // Container do menu de botões com wrap responsivo
   menu: {
+    flex: 1,
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    marginBottom: 15,
-    flexWrap: 'wrap', // Quebra para próxima linha em telas pequenas
-    gap: 10, // Espaço entre botões
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: 8,
   },
 
-  // Wrapper para cada botão (torna responsivo)
   buttonContainer: {
-    minWidth: width > 400 ? 'auto' : '48%', // 48% em telas pequenas
+    minWidth: width > 400 ? 'auto' : '48%',
     marginVertical: 5,
   },
 
-  // Texto quando usuário está logado (verde)
+  actionButton: {
+    minHeight: 42,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+
+  actionButtonPrimary: {
+    backgroundColor: '#1f6f43',
+    borderColor: '#1f6f43',
+  },
+
+  actionButtonSecondary: {
+    backgroundColor: '#ffffff',
+    borderColor: '#bdd5bf',
+  },
+
+  actionButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  actionButtonTextPrimary: {
+    color: '#ffffff',
+  },
+
+  actionButtonTextSecondary: {
+    color: '#295c37',
+  },
+
+  heroPanel: {
+    marginTop: 14,
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: '#dcecdc',
+  },
+
+  heroTitle: {
+    fontSize: width > 400 ? 22 : 18,
+    fontWeight: '800',
+    color: '#183c24',
+    marginBottom: 6,
+  },
+
+  heroSubtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#476451',
+  },
+
   loggedIn: {
     textAlign: 'center',
-    color: '#388E3C',
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#1f6f43',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 14,
   },
 
-  // Texto quando usuário não está logado (cinza)
   loggedOut: {
     textAlign: 'center',
-    color: '#999',
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#6e7f73',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 14,
   },
 
-  // Área de conteúdo principal
   content: {
     flex: 1,
     padding: width * 0.05,
   },
 
-  // Título "Histórico de Festivais"
   title: {
-    fontSize: width > 400 ? 24 : 20, // Responsivo ao tamanho da tela
-    textAlign: 'center',
+    fontSize: width > 400 ? 24 : 20,
+    textAlign: 'left',
     marginBottom: 20,
-    color: '#4CAF50',
-    fontWeight: '700',
+    color: '#1d4728',
+    fontWeight: '800',
   },
 
-  // Texto vazio quando não há festivais
   emptyText: {
     textAlign: 'center',
     marginTop: height * 0.1,
-    fontStyle: 'italic',
-    color: '#388E3C',
+    color: '#56705d',
     fontSize: 16,
+    lineHeight: 24,
   },
 
-  // Card do festival
   item: {
     marginBottom: 20,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderRadius: 24,
     overflow: 'hidden',
-    elevation: 3, // Sombra para Android
-    shadowColor: '#000', // Sombra para iOS
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    elevation: 5,
+    shadowColor: '#17321f',
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
   },
 
-  // Imagem do festival (responsiva)
   festivalImage: {
     width: '100%',
-    height: width * 0.6, // 60% da largura mantém proporção
+    height: 220,
     resizeMode: 'cover',
   },
 
-  // Título do festival dentro do card
+  festivalImagePlaceholder: {
+    backgroundColor: '#dbe7db',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  festivalImagePlaceholderText: {
+    fontSize: 48,
+  },
+
+  itemContent: {
+    padding: 16,
+    backgroundColor: '#ffffff',
+  },
+
+  itemTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 10,
+  },
+
   itemTitle: {
-    fontSize: 16,
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#193824',
+  },
+
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#e4f4e6',
+  },
+
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#1f6f43',
+  },
+
+  itemMeta: {
+    fontSize: 13,
+    color: '#5a6d60',
+    marginBottom: 4,
+  },
+
+  itemLink: {
+    marginTop: 10,
+    fontSize: 12,
+    color: '#1f6f43',
     fontWeight: '700',
-    color: '#fff',
-    padding: 12,
-    backgroundColor: '#4CAF50',
-    textAlignVertical: 'center',
   },
 });
 

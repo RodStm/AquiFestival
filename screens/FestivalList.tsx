@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, Button, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Festival, User } from '../types';
 
@@ -12,12 +12,14 @@ const { width } = Dimensions.get('window');
  * onLogout: Callback para deslogar
  * onSelectFestival: Callback quando festival é selecionado
  * onAddFestival: Callback para criar novo festival
+ * refreshTrigger: Trigger para recarregar festivais
  */
 interface FestivalListProps {
   user: User;
   onLogout: () => void;
   onSelectFestival: (festival: Festival) => void;
   onAddFestival: () => void;
+  refreshTrigger?: number;
 }
 
 /**
@@ -29,18 +31,19 @@ const FestivalList: React.FC<FestivalListProps> = ({
   user, 
   onLogout, 
   onSelectFestival, 
-  onAddFestival 
+  onAddFestival,
+  refreshTrigger
 }) => {
   // Estado da lista de festivais
   const [festivals, setFestivals] = useState<Festival[]>([]);
 
   /**
-   * Efeito que executa ao montar o componente
+   * Efeito que executa ao montar o componente e quando refreshTrigger muda
    * Carrega a lista de festivais do AsyncStorage
    */
   useEffect(() => {
     loadFestivals();
-  }, []);
+  }, [refreshTrigger]);
 
   /**
    * Carrega todos os festivais do AsyncStorage
@@ -51,11 +54,47 @@ const FestivalList: React.FC<FestivalListProps> = ({
       if (data) {
         const parsed: Festival[] = JSON.parse(data);
         setFestivals(parsed);
+      } else {
+        setFestivals([]);
       }
     } catch (error) {
       console.error('Erro ao carregar festivais:', error);
     }
   };
+
+  const toggleFestivalStatus = async (festivalId: string) => {
+    if (!user.isAdmin) {
+      return;
+    }
+
+    try {
+      const data = await AsyncStorage.getItem('festivals');
+      const storedFestivals: Festival[] = data ? JSON.parse(data) : [];
+      const updatedFestivals = storedFestivals.map((festival) =>
+        festival.id === festivalId
+          ? { ...festival, suspended: !festival.suspended }
+          : festival
+      );
+
+      await AsyncStorage.setItem('festivals', JSON.stringify(updatedFestivals));
+      setFestivals(updatedFestivals);
+    } catch (error) {
+      console.error('Erro ao atualizar status do festival:', error);
+    }
+  };
+
+  const renderActionButton = (label: string, onPress: () => void, variant: 'primary' | 'danger' = 'primary') => (
+    <TouchableOpacity
+      style={[
+        styles.actionButton,
+        variant === 'danger' ? styles.actionButtonDanger : styles.actionButtonPrimary,
+      ]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      <Text style={styles.actionButtonText}>{label}</Text>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.container}>
@@ -69,20 +108,8 @@ const FestivalList: React.FC<FestivalListProps> = ({
 
       {/* ===== BOTÕES DE AÇÃO ===== */}
       <View style={styles.buttonsContainer}>
-        <View style={styles.buttonWrapper}>
-          <Button 
-            title="Adicionar Festival" 
-            onPress={onAddFestival}
-            color="#4CAF50"
-          />
-        </View>
-        <View style={styles.buttonWrapper}>
-          <Button 
-            title="Logout" 
-            onPress={onLogout}
-            color="#d32f2f"
-          />
-        </View>
+        {user.isAdmin && <View style={styles.buttonWrapper}>{renderActionButton('Adicionar Festival', onAddFestival)}</View>}
+        <View style={styles.buttonWrapper}>{renderActionButton('Logout', onLogout, 'danger')}</View>
       </View>
 
       {/* ===== LISTA DE FESTIVAIS ===== */}
@@ -99,27 +126,50 @@ const FestivalList: React.FC<FestivalListProps> = ({
         <FlatList
           data={festivals}
           keyExtractor={(item) => item.id}
-          // Renderiza cada festival como um item clicável
           renderItem={({ item, index }) => (
-            <TouchableOpacity 
-              style={styles.item} 
-              onPress={() => onSelectFestival(item)}
-              activeOpacity={0.7}
-            >
-              {/* Número do item (para referência) */}
-              <Text style={styles.itemNumber}>{index + 1}</Text>
-              
-              {/* Nome do festival */}
-              <View style={styles.itemContent}>
-                <Text style={styles.itemName}>{item.name}</Text>
-                <Text style={styles.itemDate}>
-                  {item.startDate} a {item.endDate}
-                </Text>
-              </View>
-              
-              {/* Indica que é clicável */}
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
+            <View style={styles.item}>
+              <TouchableOpacity
+                style={styles.itemMainArea}
+                onPress={() => onSelectFestival(item)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.itemNumber}>{index + 1}</Text>
+
+                <View style={styles.itemContent}>
+                  <View style={styles.itemHeaderRow}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                    <View style={[styles.stateBadge, item.suspended ? styles.stateBadgeOff : styles.stateBadgeOn]}>
+                      <Text style={[styles.stateBadgeText, item.suspended ? styles.stateBadgeTextOff : styles.stateBadgeTextOn]}>
+                        {item.suspended ? 'Suspenso' : 'Ativo'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.itemDate}>
+                    {item.startDate} a {item.endDate}
+                  </Text>
+                  {item.suspended && (
+                    <Text style={styles.suspendedText}>Festival suspenso</Text>
+                  )}
+                </View>
+
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
+
+              {user.isAdmin && (
+                <TouchableOpacity
+                  style={[
+                    styles.statusButton,
+                    item.suspended ? styles.statusButtonOff : styles.statusButtonOn,
+                  ]}
+                  onPress={() => toggleFestivalStatus(item.id)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.statusButtonText}>
+                    {item.suspended ? 'OFF' : 'ON'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
           )}
           scrollEnabled={true}
           showsVerticalScrollIndicator={true}
@@ -133,59 +183,78 @@ const FestivalList: React.FC<FestivalListProps> = ({
  * Estilos responsivos da tela de Lista
  */
 const styles = StyleSheet.create({
-  // Container principal
   container: {
     flex: 1,
-    backgroundColor: '#f0f8f0',
+    backgroundColor: '#eef5ef',
   },
 
-  // Header com título
   header: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#1f6f43',
     paddingHorizontal: width * 0.05,
-    paddingVertical: 16,
-    borderBottomWidth: 3,
-    borderBottomColor: '#2E7D32',
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#185434',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
 
-  // Título
   title: {
     fontSize: width > 400 ? 26 : 22,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#fff',
     textAlign: 'center',
     marginBottom: 8,
   },
 
-  // Informação do usuário
   userInfo: {
-    fontSize: 12,
-    color: '#e8f5e9',
+    fontSize: 13,
+    color: '#dcedde',
     textAlign: 'center',
   },
 
-  // Nome do usuário em destaque
   userName: {
     fontWeight: '700',
     color: '#fff',
   },
 
-  // Container dos botões de ação
   buttonsContainer: {
     flexDirection: 'row',
     gap: 10,
     padding: width * 0.04,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    backgroundColor: 'transparent',
   },
 
-  // Wrapper para cada botão
   buttonWrapper: {
     flex: 1,
   },
 
-  // Container vazio (quando não há festivais)
+  actionButton: {
+    minHeight: 46,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    elevation: 2,
+    shadowColor: '#183c24',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+
+  actionButtonPrimary: {
+    backgroundColor: '#1f6f43',
+  },
+
+  actionButtonDanger: {
+    backgroundColor: '#c8463c',
+  },
+
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -193,7 +262,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
 
-  // Texto vazio
   emptyText: {
     fontSize: 18,
     color: '#388E3C',
@@ -202,7 +270,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  // Subtexto vazio
   emptySubtext: {
     fontSize: 14,
     color: '#999',
@@ -210,54 +277,128 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 
-  // Item da lista de festivais
   item: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: width * 0.04,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
     backgroundColor: '#fff',
-    marginVertical: 4,
+    marginVertical: 8,
     marginHorizontal: width * 0.02,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
-    borderRadius: 4,
+    borderRadius: 22,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#17321f',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
   },
 
-  // Número do item
+  itemMainArea: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: width * 0.04,
+  },
+
   itemNumber: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#4CAF50',
+    color: '#1f6f43',
     marginRight: 12,
-    minWidth: 30,
+    minWidth: 34,
+    height: 34,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    backgroundColor: '#e5f3e8',
+    borderRadius: 17,
+    overflow: 'hidden',
+    paddingTop: 7,
   },
 
-  // Conteúdo do item (nome e data)
   itemContent: {
     flex: 1,
   },
 
-  // Nome do festival
+  itemHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 6,
+  },
+
   itemName: {
+    flex: 1,
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
+    fontWeight: '800',
+    color: '#193824',
   },
 
-  // Data do festival
   itemDate: {
-    fontSize: 12,
-    color: '#999',
+    fontSize: 13,
+    color: '#5a6d60',
   },
 
-  // Chevron indicativo
+  stateBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+
+  stateBadgeOn: {
+    backgroundColor: '#e5f3e8',
+  },
+
+  stateBadgeOff: {
+    backgroundColor: '#f1e1df',
+  },
+
+  stateBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+
+  stateBadgeTextOn: {
+    color: '#1f6f43',
+  },
+
+  stateBadgeTextOff: {
+    color: '#b03d33',
+  },
+  suspendedText: {
+    fontSize: 13,
+    color: '#d32f2f',
+    fontWeight: '700',
+    marginTop: 6,
+  },
+
+  statusButton: {
+    minWidth: 70,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    borderRadius: 999,
+  },
+
+  statusButtonOn: {
+    backgroundColor: '#2E7D32',
+  },
+
+  statusButtonOff: {
+    backgroundColor: '#9e9e9e',
+  },
+
+  statusButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
   chevron: {
     fontSize: 24,
-    color: '#4CAF50',
+    color: '#8cae94',
     fontWeight: '300',
   },
 });

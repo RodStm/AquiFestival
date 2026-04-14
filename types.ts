@@ -1,12 +1,13 @@
 export interface Festival {
   id: string;
   name: string;
-  poster: string; // uri
-  location: string; // text or coords
+  poster: string;
+  location: string;
   history: string;
   startDate: string;
   endDate: string;
-  createdBy: string; // userId do criador
+  createdBy: string;
+  suspended?: boolean;
 }
 
 export interface User {
