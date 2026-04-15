@@ -218,15 +218,24 @@ const FestivalDetail: React.FC<FestivalDetailProps> = ({
     <View style={styles.container}>
       {/* ===== HEADER COM MENU ===== */}
       <View style={styles.header}>
+        <TouchableOpacity
+          onPress={onBack}
+          activeOpacity={0.8}
+          style={styles.logoButton}
+        >
+          <Image source={require('../assets/logo.png')} style={styles.logo} />
+        </TouchableOpacity>
+
+        <Text style={styles.headerTitle} numberOfLines={2}>
+          {festival.name}
+        </Text>
+
         <TouchableOpacity 
           onPress={() => setMenuOpen(!menuOpen)} 
           style={styles.menuButton}
         >
           <Text style={styles.menuIcon}>≡</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={2}>
-          {festival.name}
-        </Text>
       </View>
 
       {/* ===== MENU DROP-DOWN ===== */}
@@ -396,8 +405,19 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 24,
   },
 
+  logoButton: {
+    marginRight: 14,
+    borderRadius: 18,
+  },
+
+  logo: {
+    width: 50,
+    height: 50,
+    resizeMode: 'contain',
+  },
+
   menuButton: {
-    paddingRight: 15,
+    paddingLeft: 15,
     paddingVertical: 8,
   },
 

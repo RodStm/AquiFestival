@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Text, TextInput, StyleSheet, Alert, Dimensions, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { ScrollView, View, Text, TextInput, StyleSheet, Alert, Dimensions, KeyboardAvoidingView, Platform, TouchableOpacity, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { Festival, User } from '../types';
@@ -162,6 +162,10 @@ const AddEditFestival: React.FC<AddEditFestivalProps> = ({
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        <TouchableOpacity onPress={onCancel} activeOpacity={0.8} style={styles.logoButton}>
+          <Image source={require('../assets/logo.png')} style={styles.logo} />
+        </TouchableOpacity>
+
         {!user?.isAdmin && (
           <View style={styles.warningContainer}>
             <Text style={styles.warningText}>
@@ -277,6 +281,18 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: width * 0.08,
     paddingVertical: 20,
+  },
+
+  logoButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 18,
+    borderRadius: 18,
+  },
+
+  logo: {
+    width: 54,
+    height: 54,
+    resizeMode: 'contain',
   },
 
   headerBlock: {

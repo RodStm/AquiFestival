@@ -93,6 +93,7 @@ export default function App() {
     return (
       <Home
         user={user}
+        onGoHome={goHome}
         onLogin={() => setScreen('login')}
         onRegisterUser={() => setScreen('register')}
         onRegisterFestival={handleAddFestival}
@@ -115,6 +116,7 @@ export default function App() {
     return (
       <FestivalList
         user={user!}
+        onGoHome={goHome}
         onLogout={handleLogout}
         onSelectFestival={handleSelectFestival}
         onAddFestival={handleAddFestival}

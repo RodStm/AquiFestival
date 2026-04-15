@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Dimensions, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Festival, User } from '../types';
 
@@ -16,6 +16,7 @@ const { width } = Dimensions.get('window');
  */
 interface FestivalListProps {
   user: User;
+  onGoHome: () => void;
   onLogout: () => void;
   onSelectFestival: (festival: Festival) => void;
   onAddFestival: () => void;
@@ -29,6 +30,7 @@ interface FestivalListProps {
  */
 const FestivalList: React.FC<FestivalListProps> = ({ 
   user, 
+  onGoHome,
   onLogout, 
   onSelectFestival, 
   onAddFestival,
@@ -100,10 +102,17 @@ const FestivalList: React.FC<FestivalListProps> = ({
     <View style={styles.container}>
       {/* ===== HEADER ===== */}
       <View style={styles.header}>
-        <Text style={styles.title}>Festivais do Tapajós</Text>
-        <Text style={styles.userInfo}>
-          Logado como: <Text style={styles.userName}>{user.name || user.email}</Text>
-        </Text>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity onPress={onGoHome} activeOpacity={0.8} style={styles.logoButton}>
+            <Image source={require('../assets/logo.png')} style={styles.logo} />
+          </TouchableOpacity>
+          <View style={styles.headerTextBlock}>
+            <Text style={styles.title}>Festivais do Tapajós</Text>
+            <Text style={styles.userInfo}>
+              Logado como: <Text style={styles.userName}>{user.name || user.email}</Text>
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* ===== BOTÕES DE AÇÃO ===== */}
@@ -198,18 +207,38 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 24,
   },
 
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  logoButton: {
+    marginRight: 14,
+    borderRadius: 18,
+  },
+
+  logo: {
+    width: 54,
+    height: 54,
+    resizeMode: 'contain',
+  },
+
+  headerTextBlock: {
+    flex: 1,
+  },
+
   title: {
     fontSize: width > 400 ? 26 : 22,
     fontWeight: '800',
     color: '#fff',
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 8,
   },
 
   userInfo: {
     fontSize: 13,
     color: '#dcedde',
-    textAlign: 'center',
+    textAlign: 'left',
   },
 
   userName: {

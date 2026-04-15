@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert, Dimensions, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert, Dimensions, KeyboardAvoidingView, Platform, TouchableOpacity, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '../types';
 
@@ -95,6 +95,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, onCancel }) => {
       style={styles.container}
     >
       <View style={styles.innerContainer}>
+        <TouchableOpacity onPress={onCancel} activeOpacity={0.8} style={styles.logoButton}>
+          <Image source={require('../assets/logo.png')} style={styles.logo} />
+        </TouchableOpacity>
+
         <View style={styles.headerBlock}>
           <Text style={styles.eyebrow}>AquiFest</Text>
           <Text style={styles.title}>Acesso a Conta</Text>
@@ -165,6 +169,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: width * 0.08,
     paddingVertical: height * 0.05,
+  },
+
+  logoButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 18,
+    borderRadius: 18,
+  },
+
+  logo: {
+    width: 54,
+    height: 54,
+    resizeMode: 'contain',
   },
 
   headerBlock: {

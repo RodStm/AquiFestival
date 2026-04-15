@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert, ScrollView, TouchableOpacity, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert, ScrollView, TouchableOpacity, Dimensions, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '../types';
 
@@ -169,6 +169,10 @@ const RegisterUser: React.FC<RegisterUserProps> = ({ onRegister, onCancel }) => 
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        <TouchableOpacity onPress={onCancel} activeOpacity={0.8} style={styles.logoButton}>
+          <Image source={require('../assets/logo.png')} style={styles.logo} />
+        </TouchableOpacity>
+
         <View style={styles.headerBlock}>
           <Text style={styles.eyebrow}>AquiFest</Text>
           <Text style={styles.title}>Criar Conta</Text>
@@ -303,6 +307,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: width * 0.08,
     paddingVertical: height * 0.03,
+  },
+
+  logoButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 18,
+    borderRadius: 18,
+  },
+
+  logo: {
+    width: 54,
+    height: 54,
+    resizeMode: 'contain',
   },
 
   headerBlock: {

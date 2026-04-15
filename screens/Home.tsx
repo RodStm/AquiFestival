@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Image, ImageBackground, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, Festival } from '../types';
 
 // Obtém as dimensões da tela para criar layouts responsivos
 const { width, height } = Dimensions.get('window');
+
+const heroBannerImage = {
+  uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Rio_Tapaj%C3%B3s,_visto_da_base_do_PN_da_Amaz%C3%B4nia.jpg/1280px-Rio_Tapaj%C3%B3s,_visto_da_base_do_PN_da_Amaz%C3%B4nia.jpg',
+};
 
 /**
  * Props da tela Home
@@ -18,6 +22,7 @@ const { width, height } = Dimensions.get('window');
  */
 interface HomeProps {
   user: User | null;
+  onGoHome: () => void;
   onLogin: () => void;
   onRegisterUser: () => void;
   onRegisterFestival: () => void;
@@ -33,6 +38,7 @@ interface HomeProps {
  */
 const Home: React.FC<HomeProps> = ({ 
   user, 
+  onGoHome,
   onLogin, 
   onRegisterUser, 
   onRegisterFestival, 
@@ -43,6 +49,7 @@ const Home: React.FC<HomeProps> = ({
   // Estado dos festivais carregados
   const [festivals, setFestivals] = useState<Festival[]>([]);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+  const [bannerImageError, setBannerImageError] = useState(false);
 
   /**
    * Efeito que executa quando o componente monta ou refreshTrigger muda
@@ -96,13 +103,15 @@ const Home: React.FC<HomeProps> = ({
     </TouchableOpacity>
   );
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.pageContent}>
       {/* ===== HEADER COM LOGO E MENU ===== */}
       <View style={styles.header}>
         {/* Linha superior com Logo e Menu lado a lado */}
         <View style={styles.topRow}>
           {/* Logo da aplicação - Lado esquerdo */}
-          <Image source={require('../assets/logo.png')} style={styles.logo} />
+          <TouchableOpacity onPress={onGoHome} activeOpacity={0.8} style={styles.logoButton}>
+            <Image source={require('../assets/logo.png')} style={styles.logo} />
+          </TouchableOpacity>
           
           {/* Menu de navegação responsivo - Expandido */}
           <View style={styles.menu}>
@@ -126,12 +135,31 @@ const Home: React.FC<HomeProps> = ({
           </View>
         </View>
 
-        <View style={styles.heroPanel}>
-          <Text style={styles.heroTitle}>Celebre os festivais do Tapajos</Text>
-          <Text style={styles.heroSubtitle}>
-            Explore eventos ativos com uma visualizacao mais limpa e destaque para datas e locais.
-          </Text>
-        </View>
+        {bannerImageError ? (
+          <View style={[styles.heroBanner, styles.heroBannerFallback]}>
+            <View style={styles.heroBannerOverlay}>
+              <Text style={styles.heroBannerEyebrow}>O Tapajos em festa</Text>
+              <Text style={styles.heroBannerQuote}>
+                Os festivais do Tapajos celebram a memoria, a fe e a forca das comunidades que mantem viva a cultura da regiao.
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <ImageBackground
+            source={heroBannerImage}
+            style={styles.heroBanner}
+            imageStyle={styles.heroBannerImage}
+            onError={() => setBannerImageError(true)}
+          >
+            <View style={styles.heroBannerOverlay}>
+              <Text style={styles.heroBannerEyebrow}>O Tapajos em festa</Text>
+              <Text style={styles.heroBannerQuote}>
+                Os festivais do Tapajos celebram a memoria, a fe e a forca das comunidades que mantem viva a cultura da regiao.
+              </Text>
+            </View>
+          </ImageBackground>
+        )}
+
 
         {/* Status de login do usuário - Abaixo */}
         {user ? (
@@ -144,58 +172,55 @@ const Home: React.FC<HomeProps> = ({
       </View>
 
       {/* ===== CONTEÚDO PRINCIPAL ===== */}
-      <View style={styles.content}>
+      <View style={styles.sectionHeader}>
         <Text style={styles.title}>Histórico de Festivais</Text>
-        
-        {/* Exibe mensagem vazia ou lista de festivais */}
-        {festivals.length === 0 ? (
+      </View>
+
+      {festivals.length === 0 ? (
+        <View style={styles.emptyState}>
           <Text style={styles.emptyText}>
             Nenhum festival cadastrado ainda.
           </Text>
-        ) : (
-          <FlatList
-            data={festivals}
-            keyExtractor={(item) => item.id}
-            // Renderiza cada festival como um card clicável
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.item} 
-                onPress={() => onSelectFestival(item)}
-                activeOpacity={0.7}
-              >
-                {/* Imagem do festival com tratamento de erro */}
-                {imageErrors[item.id] || !item.poster ? (
-                  <View style={[styles.festivalImage, styles.festivalImagePlaceholder]}>
-                    <Text style={styles.festivalImagePlaceholderText}>📸</Text>
-                  </View>
-                ) : (
-                  <Image 
-                    source={{ uri: item.poster }} 
-                    style={styles.festivalImage}
-                    onError={() => {
-                      setImageErrors(prev => ({ ...prev, [item.id]: true }));
-                    }}
-                  />
-                )}
-                <View style={styles.itemContent}>
-                  <View style={styles.itemTopRow}>
-                    <Text style={styles.itemTitle}>{item.name}</Text>
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>Ativo</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.itemMeta}>📅 {item.startDate} ate {item.endDate}</Text>
-                  <Text style={styles.itemMeta}>📍 {item.location}</Text>
-                  <Text style={styles.itemLink}>Toque para ver detalhes</Text>
+        </View>
+      ) : (
+        <View style={styles.listContent}>
+          {festivals.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={styles.item}
+              onPress={() => onSelectFestival(item)}
+              activeOpacity={0.7}
+            >
+              {/* Imagem do festival com tratamento de erro */}
+              {imageErrors[item.id] || !item.poster ? (
+                <View style={[styles.festivalImage, styles.festivalImagePlaceholder]}>
+                  <Text style={styles.festivalImagePlaceholderText}>📸</Text>
                 </View>
-              </TouchableOpacity>
-            )}
-            scrollEnabled={true}
-            showsVerticalScrollIndicator={true}
-          />
-        )}
-      </View>
-    </View>
+              ) : (
+                <Image
+                  source={{ uri: item.poster }}
+                  style={styles.festivalImage}
+                  onError={() => {
+                    setImageErrors(prev => ({ ...prev, [item.id]: true }));
+                  }}
+                />
+              )}
+              <View style={styles.itemContent}>
+                <View style={styles.itemTopRow}>
+                  <Text style={styles.itemTitle}>{item.name}</Text>
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>Ativo</Text>
+                  </View>
+                </View>
+                <Text style={styles.itemMeta}>📅 {item.startDate} ate {item.endDate}</Text>
+                <Text style={styles.itemMeta}>📍 {item.location}</Text>
+                <Text style={styles.itemLink}>Toque para ver detalhes</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </ScrollView>
   );
 };
 
@@ -207,6 +232,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#eef5ef',
+  },
+
+  pageContent: {
+    paddingBottom: 24,
   },
 
   header: {
@@ -225,8 +254,12 @@ const styles = StyleSheet.create({
   logo: {
     width: 50,
     height: 50,
-    marginRight: 15,
     resizeMode: 'contain',
+  },
+
+  logoButton: {
+    marginRight: 15,
+    borderRadius: 18,
   },
 
   menu: {
@@ -281,6 +314,56 @@ const styles = StyleSheet.create({
     backgroundColor: '#dcecdc',
   },
 
+  heroBanner: {
+    marginTop: 16,
+    height: width > 400 ? 380 : 300,
+    borderRadius: 24,
+    overflow: 'hidden',
+    backgroundColor: '#355845',
+  },
+
+  heroBannerImage: {
+    borderRadius: 24,
+  },
+
+  heroBannerFallback: {
+    justifyContent: 'center',
+  },
+
+  heroBannerOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    backgroundColor: 'rgba(14, 31, 21, 0.42)',
+  },
+
+  heroBannerEyebrow: {
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(240, 248, 238, 0.24)',
+    color: '#f3f8f0',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+
+  heroBannerQuote: {
+    maxWidth: 320,
+    textAlign: 'center',
+    color: '#ffffff',
+    fontSize: width > 400 ? 24 : 20,
+    lineHeight: width > 400 ? 32 : 28,
+    fontWeight: '800',
+    textShadowColor: 'rgba(0, 0, 0, 0.28)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
+  },
+
   heroTitle: {
     fontSize: width > 400 ? 22 : 18,
     fontWeight: '800',
@@ -310,9 +393,20 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
 
-  content: {
+  sectionHeader: {
+    paddingHorizontal: width * 0.05,
+    paddingTop: 24,
+    paddingBottom: 8,
+  },
+
+  listContent: {
+    paddingHorizontal: width * 0.05,
+    paddingBottom: 24,
+  },
+
+  emptyState: {
     flex: 1,
-    padding: width * 0.05,
+    paddingHorizontal: width * 0.05,
   },
 
   title: {
@@ -336,6 +430,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 24,
     overflow: 'hidden',
+    width: '100%',
     elevation: 5,
     shadowColor: '#17321f',
     shadowOpacity: 0.12,
